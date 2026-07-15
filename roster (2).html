@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>選手名簿 - MARTIAL GRAPPLING RULES</title>
+<style>
+  *{box-sizing:border-box;}
+  html,body{ margin:0; padding:0; background:#dcdcdc; color:#000;
+    font-family:"Yu Gothic","Hiragino Kaku Gothic ProN",Arial,sans-serif; }
+  #wrap{ padding:16px; max-width:820px; margin:0 auto; }
+  h1{ font-size:15px; letter-spacing:.08em; color:#333; font-weight:700; margin:0 0 6px; }
+  .help{ font-size:12px; color:#444; margin-bottom:14px; line-height:1.6; }
+  .help b{ color:#000; }
+
+  table.roster{ border-collapse:collapse; width:100%; background:#fff; }
+  table.roster th, table.roster td{
+    border:1px solid #999; padding:0; text-align:center; vertical-align:middle;
+  }
+  table.roster th{
+    background:#d9d9d9; font-size:13px; font-weight:700; padding:6px 0;
+  }
+  td.matchCell{
+    width:60px; font-size:16px; font-weight:700; cursor:pointer; background:#d9d9d9;
+    transition:background .15s;
+  }
+  td.matchCell:hover{ background:#ffe28a; }
+  td.matchCell.loaded{ background:#ffd54a; }
+  td.matchCell .num{ font-family:Arial,sans-serif; }
+
+  table.roster input{
+    width:100%; height:100%; border:none; padding:8px 6px; font-size:14px;
+    background:transparent; color:#000; box-sizing:border-box;
+  }
+  table.roster input:focus{ outline:2px solid #3b8fc4; outline-offset:-2px; }
+  tr.rowP1 td:not(.matchCell){ background:#6EC8F5; }
+  tr.rowP2 td:not(.matchCell){ background:#FFFFFF; }
+
+  .toolbar{ display:flex; gap:8px; margin-top:12px; }
+  .toolbar button{
+    background:#fff; border:1px solid #999; color:#333; padding:8px 14px;
+    border-radius:2px; cursor:pointer; font-size:12px;
+  }
+  .toolbar button:hover{ background:#eee; }
+
+  .flashNote{
+    position:fixed; top:16px; right:16px; background:#2f9e44; color:#fff;
+    padding:10px 18px; border-radius:3px; font-size:13px; font-weight:700;
+    opacity:0; transition:opacity .2s; pointer-events:none;
+  }
+  .flashNote.show{ opacity:1; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>MARTIAL GRAPPLING RULES ー 選手名簿</h1>
+  <div class="help">
+    Excelで「名前」「道場名」の2列を選択してコピーし、下の表の好きなマスをクリックしてから<b>そのまま貼り付け(Ctrl+V)</b>してください。貼り付けた位置を起点に自動で埋まります。<br>
+    1試合につき2行(上段・下段)です。左端の<b>試合番号をクリック</b>すると、その2名がスコアラー操作画面に反映されます。
+  </div>
+
+  <table class="roster" id="rosterTable">
+    <tr>
+      <th style="width:60px;">試合</th>
+      <th>名前 (Name)</th>
+      <th>道場 (Academy)</th>
+    </tr>
+  </table>
+
+  <div class="toolbar">
+    <button id="addMatchesBtn">＋ 試合を10件追加</button>
+    <button id="clearBtn">全てクリア</button>
+  </div>
+</div>
+
+<div class="flashNote" id="flashNote">スコアラー画面に反映しました</div>
+
+<script>
+const STORE_KEY = "mgr_scoreboard_state_v1";
+const ROSTER_KEY = "mgr_roster_v1";
+const table = document.getElementById("rosterTable");
+
+let matchCount = 0;
+
+function addMatchRows(n){
+  for(let i=0;i<n;i++){
+    matchCount++;
+    const matchIdx = matchCount; // 1-based
+    const row0 = 2*(matchIdx-1);
+    const row1 = row0 + 1;
+
+    const tr0 = document.createElement("tr");
+    tr0.className = "rowP1";
+    const matchTd = document.createElement("td");
+    matchTd.className = "matchCell";
+    matchTd.rowSpan = 2;
+    matchTd.dataset.match = matchIdx;
+    matchTd.innerHTML = `<span class="num">${matchIdx}</span>`;
+    tr0.appendChild(matchTd);
+    tr0.appendChild(makeCell(row0, 0));
+    tr0.appendChild(makeCell(row0, 1));
+    table.appendChild(tr0);
+
+    const tr1 = document.createElement("tr");
+    tr1.className = "rowP2";
+    tr1.appendChild(makeCell(row1, 0));
+    tr1.appendChild(makeCell(row1, 1));
+    table.appendChild(tr1);
+  }
+}
+
+function makeCell(row, col){
+  const td = document.createElement("td");
+  const input = document.createElement("input");
+  input.type = "text";
+  input.dataset.row = row;
+  input.dataset.col = col;
+  input.addEventListener("input", saveRoster);
+  input.addEventListener("paste", onPaste);
+  td.appendChild(input);
+  return td;
+}
+
+function getInput(row, col){
+  return table.querySelector(`input[data-row="${row}"][data-col="${col}"]`);
+}
+
+function ensureRowExists(row){
+  while(matchCount * 2 <= row){
+    addMatchRows(1);
+  }
+}
+
+function onPaste(e){
+  e.preventDefault();
+  const text = (e.clipboardData || window.clipboardData).getData("text");
+  let lines = text.split(/\r\n|\n|\r/);
+  if(lines.length && lines[lines.length-1] === "") lines.pop();
+  if(lines.length === 0) return;
+
+  const startRow = parseInt(e.target.dataset.row, 10);
+  const startCol = parseInt(e.target.dataset.col, 10);
+
+  lines.forEach((line, i)=>{
+    const cells = line.split("\t");
+    cells.forEach((val, j)=>{
+      const r = startRow + i, c = startCol + j;
+      if(c > 1) return; // 名前・道場の2列まで
+      ensureRowExists(r);
+      const inp = getInput(r, c);
+      if(inp) inp.value = val;
+    });
+  });
+  saveRoster();
+}
+
+function saveRoster(){
+  const data = [];
+  table.querySelectorAll("input").forEach(inp=>{
+    data.push({ row: parseInt(inp.dataset.row,10), col: parseInt(inp.dataset.col,10), value: inp.value });
+  });
+  localStorage.setItem(ROSTER_KEY, JSON.stringify({ matchCount, data }));
+}
+
+function loadRoster(){
+  try{
+    const raw = localStorage.getItem(ROSTER_KEY);
+    if(!raw){ addMatchRows(10); return; }
+    const saved = JSON.parse(raw);
+    addMatchRows(Math.max(saved.matchCount || 10, 10));
+    (saved.data || []).forEach(d=>{
+      const inp = getInput(d.row, d.col);
+      if(inp) inp.value = d.value;
+    });
+  }catch(e){ addMatchRows(10); }
+}
+
+function flash(msg){
+  const el = document.getElementById("flashNote");
+  el.textContent = msg;
+  el.classList.add("show");
+  setTimeout(()=> el.classList.remove("show"), 1400);
+}
+
+function loadScoreboardState(){
+  try{
+    const raw = localStorage.getItem(STORE_KEY);
+    if(!raw) return null;
+    return JSON.parse(raw);
+  }catch(e){ return null; }
+}
+
+table.addEventListener("click", (e)=>{
+  const cell = e.target.closest(".matchCell");
+  if(!cell) return;
+  const matchIdx = parseInt(cell.dataset.match, 10);
+  const row0 = 2*(matchIdx-1), row1 = row0+1;
+  const name0 = (getInput(row0,0)||{}).value || "";
+  const academy0 = (getInput(row0,1)||{}).value || "";
+  const name1 = (getInput(row1,0)||{}).value || "";
+  const academy1 = (getInput(row1,1)||{}).value || "";
+
+  if(!name0 && !name1){
+    flash("名前が入力されていません");
+    return;
+  }
+
+  const player = () => ({ escape:0, shiho:0, mount:0, turtle:0, strike:0 });
+  let state = loadScoreboardState();
+  if(!state){
+    state = {
+      names:[{name:"",academy:""},{name:"",academy:""}],
+      players:[player(),player()], backup:[player(),player()],
+      durationSec:180, remainingSec:180, timerState:0, matchNumber:1
+    };
+  }
+  state.names = [
+    { name:name0, academy:academy0 },
+    { name:name1, academy:academy1 }
+  ];
+  state.matchNumber = matchIdx;
+  localStorage.setItem(STORE_KEY, JSON.stringify(state));
+
+  document.querySelectorAll(".matchCell.loaded").forEach(c=>c.classList.remove("loaded"));
+  cell.classList.add("loaded");
+  flash(`MATCH ${matchIdx} をスコアラー画面に反映しました`);
+});
+
+document.getElementById("addMatchesBtn").addEventListener("click", ()=>{ addMatchRows(10); saveRoster(); });
+document.getElementById("clearBtn").addEventListener("click", ()=>{
+  if(!confirm("名簿の内容を全てクリアします。よろしいですか？")) return;
+  table.querySelectorAll("input").forEach(inp=> inp.value = "");
+  saveRoster();
+});
+
+loadRoster();
+</script>
+</body>
+</html>
