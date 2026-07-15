@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>観客表示 - MARTIAL GRAPPLING RULES</title>
+<style>
+  *{box-sizing:border-box;}
+  html,body{ margin:0; padding:0; height:100%; background:#fff;
+    display:flex; align-items:center; justify-content:center; }
+  .num{ font-family:Arial,"Yu Gothic",sans-serif; font-weight:700; }
+  table.aud-table{ border-collapse:collapse; width:96vw; table-layout:fixed; }
+  table.aud-table td{
+    border:2px solid #000; text-align:center; font-weight:700; color:#000;
+    padding:0.6vw; background:#fff;
+  }
+  td.timerCell{ font-size:6.5vw; width:26%; }
+  table.aud-table td.headCell{ font-size:1.6vw; background:#d9d9d9; }
+  td.nameCell{ text-align:left; padding-left:1.4vw; }
+  .nameMain{ font-size:2.6vw; line-height:1.2; }
+  .nameAcademy{ font-size:1.5vw; line-height:1.2; font-weight:400; color:#333; }
+  td.valCell{ font-size:6vw; }
+</style>
+</head>
+<body>
+<table class="aud-table">
+  <tr>
+    <td class="timerCell num" id="audTimer">3:00</td>
+    <td class="headCell" id="headEscape">ESCAPE</td>
+    <td class="headCell" id="headShiho">SHIHO</td>
+    <td class="headCell" id="headMount">MOUNT</td>
+    <td class="headCell" id="headTurtle">TURTLE</td>
+    <td class="headCell" id="headStrike">STRIKE</td>
+    <td class="headCell" id="headTotal">TOTAL</td>
+  </tr>
+  <tr id="row0">
+    <td class="nameCell" id="audName0">
+      <div class="nameMain" id="audNameMain0">JIROU YAMADA</div>
+      <div class="nameAcademy" id="audAcademy0"></div>
+    </td>
+    <td class="valCell num" id="audEscape0">0</td>
+    <td class="valCell num" id="audShiho0">0</td>
+    <td class="valCell num" id="audMount0">0</td>
+    <td class="valCell num" id="audTurtle0">0</td>
+    <td class="valCell num" id="audStrike0">0</td>
+    <td class="valCell num" id="audTotal0">0</td>
+  </tr>
+  <tr id="row1">
+    <td class="nameCell" id="audName1">
+      <div class="nameMain" id="audNameMain1">BAN MOROBOSHI</div>
+      <div class="nameAcademy" id="audAcademy1"></div>
+    </td>
+    <td class="valCell num" id="audEscape1">0</td>
+    <td class="valCell num" id="audShiho1">0</td>
+    <td class="valCell num" id="audMount1">0</td>
+    <td class="valCell num" id="audTurtle1">0</td>
+    <td class="valCell num" id="audStrike1">0</td>
+    <td class="valCell num" id="audTotal1">0</td>
+  </tr>
+</table>
+
+<script>
+const STORE_KEY = "mgr_scoreboard_state_v1";
+
+/* 色は全てここでJSから直接指定する（CSSの詳細度に一切依存させない） */
+const YELLOW = "#FFFF00";
+const ROW_BASE   = ["#6EC8F5", "#FFFFFF"];  // [プレイヤー1(青側), プレイヤー2(白側)]
+const ROW_ESCAPE = ["#00B050", "#92D050"];
+const ROW_STRIKE = ["#C00000", "#FF0000"];
+
+function defaultState(){
+  const player = () => ({ escape:0, shiho:0, mount:0, turtle:0, strike:0 });
+  return {
+    names: [{name:"JIROU YAMADA", academy:""}, {name:"BAN MOROBOSHI", academy:""}],
+    players: [player(), player()],
+    backup: [player(), player()],
+    durationSec: 180,
+    remainingSec: 180,
+    timerState: 0,
+    matchNumber: 1
+  };
+}
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORE_KEY);
+    if(!raw) return defaultState();
+    const s = JSON.parse(raw);
+    if(!s.players || !s.names) return defaultState();
+    s.names = s.names.map(n => (typeof n === "string") ? {name:n, academy:""} : n);
+    return s;
+  }catch(e){ return defaultState(); }
+}
+
+function total(p){ return p.escape + p.shiho + p.mount + p.turtle + p.strike; }
+function fmt(sec){
+  sec = Math.max(0, sec);
+  const m = Math.floor(sec/60), s = sec%60;
+  return m + ":" + String(s).padStart(2,"0");
+}
+
+function setRowColors(p){
+  document.getElementById("audName"+p).style.backgroundColor   = ROW_BASE[p];
+  document.getElementById("audShiho"+p).style.backgroundColor  = ROW_BASE[p];
+  document.getElementById("audMount"+p).style.backgroundColor  = ROW_BASE[p];
+  document.getElementById("audTurtle"+p).style.backgroundColor = ROW_BASE[p];
+  document.getElementById("audTotal"+p).style.backgroundColor  = ROW_BASE[p];
+  document.getElementById("audEscape"+p).style.backgroundColor = ROW_ESCAPE[p];
+  document.getElementById("audStrike"+p).style.backgroundColor = ROW_STRIKE[p];
+}
+
+const HEAD_GRAY = "#d9d9d9";
+const HEAD_IDS = ["headEscape","headShiho","headMount","headTurtle","headStrike","headTotal"];
+function setHeaderAlert(on){
+  HEAD_IDS.forEach(id=>{
+    document.getElementById(id).style.backgroundColor = on ? YELLOW : HEAD_GRAY;
+  });
+}
+
+function render(){
+  const state = loadState();
+  document.getElementById("audTimer").style.backgroundColor = YELLOW;
+  document.getElementById("audTimer").textContent = fmt(state.remainingSec);
+
+  const alertOn = state.timerState === 2;
+  setHeaderAlert(alertOn);
+  [0,1].forEach(p=>{
+    document.getElementById("audNameMain"+p).textContent = state.names[p].name;
+    document.getElementById("audAcademy"+p).textContent  = state.names[p].academy;
+    document.getElementById("audEscape"+p).textContent = state.players[p].escape;
+    document.getElementById("audShiho"+p).textContent  = state.players[p].shiho;
+    document.getElementById("audMount"+p).textContent  = state.players[p].mount;
+    document.getElementById("audTurtle"+p).textContent = state.players[p].turtle;
+    document.getElementById("audStrike"+p).textContent = state.players[p].strike;
+    document.getElementById("audTotal"+p).textContent  = total(state.players[p]);
+    setRowColors(p);
+  });
+}
+
+render();
+setInterval(render, 250);
+</script>
+</body>
+</html>
