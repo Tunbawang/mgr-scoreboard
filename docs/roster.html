@@ -49,27 +49,41 @@
     opacity:0; transition:opacity .2s; pointer-events:none;
   }
   .flashNote.show{ opacity:1; }
+
+  .langBar{ display:flex; justify-content:flex-end; gap:6px; margin-bottom:8px; }
+  .langBar button{
+    background:#fff; border:1px solid #999; color:#333; padding:4px 10px;
+    border-radius:2px; cursor:pointer; font-size:11px;
+  }
+  .langBar button.active{ background:#FFFF00; font-weight:700; }
+  .langBar button:hover{ background:#eee; }
 </style>
 </head>
 <body>
 <div id="wrap">
-  <h1>MARTIAL GRAPPLING RULES ー 選手名簿</h1>
-  <div class="help">
-    Excelで「名前」「道場名」の2列を選択してコピーし、下の表の好きなマスをクリックしてから<b>そのまま貼り付け(Ctrl+V)</b>してください。貼り付けた位置を起点に自動で埋まります。<br>
+  <div class="langBar" id="langBar">
+    <button data-lang="ja">日本語</button>
+    <button data-lang="en">English</button>
+    <button data-lang="pt">Português</button>
+    <button data-lang="zh">中文</button>
+  </div>
+  <h1><span data-i18n="brand">MARTIAL GRAPPLING RULES</span> <span data-i18n="rosterH1suffix">ー 参加者名簿</span></h1>
+  <div class="help" id="helpText" data-i18n-html="helpText">
+    Excelで「参加者名」「道場名」の2列を選択してコピーし、下の表の好きなマスをクリックしてから<b>そのまま貼り付け(Ctrl+V)</b>してください。貼り付けた位置を起点に自動で埋まります。<br>
     1試合につき2行(上段・下段)です。左端の<b>試合番号をクリック</b>すると、その2名がスコアラー操作画面に反映されます。
   </div>
 
   <table class="roster" id="rosterTable">
     <tr>
-      <th style="width:60px;">試合</th>
-      <th>名前 (Name)</th>
-      <th>道場 (Academy)</th>
+      <th style="width:60px;" data-i18n="colMatch">試合</th>
+      <th data-i18n="colParticipant">参加者</th>
+      <th data-i18n="colAcademy">道場</th>
     </tr>
   </table>
 
   <div class="toolbar">
-    <button id="addMatchesBtn">＋ 試合を10件追加</button>
-    <button id="clearBtn">全てクリア</button>
+    <button id="addMatchesBtn" data-i18n="addMatches">＋ 試合を10件追加</button>
+    <button id="clearBtn" data-i18n="clearAll">全てクリア</button>
   </div>
 </div>
 
@@ -78,7 +92,93 @@
 <script>
 const STORE_KEY = "mgr_scoreboard_state_v1";
 const ROSTER_KEY = "mgr_roster_v1";
+const LANG_KEY = "mgr_lang_v1";
 const table = document.getElementById("rosterTable");
+
+const TITLES = {
+  ja: "参加者名簿 - MARTIAL GRAPPLING RULES",
+  en: "Participant Roster - MARTIAL GRAPPLING RULES",
+  pt: "Lista de Participantes - MARTIAL GRAPPLING RULES",
+  zh: "参赛者名单 - MARTIAL GRAPPLING RULES"
+};
+
+const I18N = {
+  ja: {
+    rosterH1suffix: "ー 参加者名簿",
+    helpText: 'Excelで「参加者名」「道場名」の2列を選択してコピーし、下の表の好きなマスをクリックしてから<b>そのまま貼り付け(Ctrl+V)</b>してください。貼り付けた位置を起点に自動で埋まります。<br>1試合につき2行(上段・下段)です。左端の<b>試合番号をクリック</b>すると、その2名がスコアラー操作画面に反映されます。',
+    colMatch: "試合",
+    colParticipant: "参加者",
+    colAcademy: "道場",
+    addMatches: "＋ 試合を10件追加",
+    clearAll: "全てクリア",
+    flashDefault: "スコアラー画面に反映しました",
+    flashLoaded: (n)=> `MATCH ${n} をスコアラー画面に反映しました`,
+    noName: "参加者名が入力されていません",
+    confirmClear: "名簿の内容を全てクリアします。よろしいですか？"
+  },
+  en: {
+    rosterH1suffix: "— Participant Roster",
+    helpText: 'Select the "Participant Name" and "Academy" columns in Excel, copy them, click any cell in the table below, then <b>paste directly (Ctrl+V)</b>. The table fills in automatically starting from the cell you clicked.<br>Each match uses 2 rows (top / bottom). Click the <b>match number</b> on the left to load those two participants into the Scorer Console.',
+    colMatch: "Match",
+    colParticipant: "Participant",
+    colAcademy: "Academy",
+    addMatches: "+ Add 10 Matches",
+    clearAll: "Clear All",
+    flashDefault: "Sent to Scorer Console",
+    flashLoaded: (n)=> `MATCH ${n} sent to Scorer Console`,
+    noName: "No participant name entered",
+    confirmClear: "This will clear the entire roster. Continue?"
+  },
+  pt: {
+    rosterH1suffix: "— Lista de Participantes",
+    helpText: 'No Excel, selecione as colunas "Nome do Participante" e "Academia", copie-as, clique em qualquer célula da tabela abaixo e <b>cole diretamente (Ctrl+V)</b>. A tabela é preenchida automaticamente a partir da célula clicada.<br>Cada luta usa 2 linhas (superior / inferior). Clique no <b>número da luta</b> à esquerda para enviar esses dois participantes ao Painel do Marcador.',
+    colMatch: "Luta",
+    colParticipant: "Participante",
+    colAcademy: "Academia",
+    addMatches: "+ Adicionar 10 Lutas",
+    clearAll: "Limpar Tudo",
+    flashDefault: "Enviado ao Painel do Marcador",
+    flashLoaded: (n)=> `LUTA ${n} enviada ao Painel do Marcador`,
+    noName: "Nenhum nome de participante inserido",
+    confirmClear: "Isso vai apagar toda a lista. Continuar?"
+  },
+  zh: {
+    rosterH1suffix: "— 参赛者名单",
+    helpText: '在Excel中选中「参赛者姓名」和「道馆」两列并复制，然后点击下表中任意单元格，直接<b>粘贴(Ctrl+V)</b>即可，会从点击的位置开始自动填充。<br>每场比赛占2行(上段/下段)。点击左侧的<b>比赛编号</b>，即可将这两名参赛者反映到计分员操作面板。',
+    colMatch: "比赛",
+    colParticipant: "参赛者",
+    colAcademy: "道馆",
+    addMatches: "＋ 添加10场比赛",
+    clearAll: "全部清除",
+    flashDefault: "已反映到计分员操作面板",
+    flashLoaded: (n)=> `第${n}场 已反映到计分员操作面板`,
+    noName: "尚未输入参赛者姓名",
+    confirmClear: "将清除名单中的全部内容，确定吗？"
+  }
+};
+
+function getLang(){ return localStorage.getItem(LANG_KEY) || "ja"; }
+function setLang(lang){
+  localStorage.setItem(LANG_KEY, lang);
+  applyLanguage(lang);
+}
+function applyLanguage(lang){
+  const dict = I18N[lang] || I18N.ja;
+  document.title = TITLES[lang] || TITLES.ja;
+  document.querySelectorAll("[data-i18n]").forEach(el=>{
+    const key = el.dataset.i18n;
+    if(dict[key]) el.textContent = dict[key];
+  });
+  const helpEl = document.getElementById("helpText");
+  if(dict.helpText) helpEl.innerHTML = dict.helpText;
+  document.querySelectorAll("#langBar button").forEach(btn=>{
+    btn.classList.toggle("active", btn.dataset.lang === lang);
+  });
+}
+document.querySelectorAll("#langBar button").forEach(btn=>{
+  btn.addEventListener("click", ()=> setLang(btn.dataset.lang));
+});
+applyLanguage(getLang());
 
 let matchCount = 0;
 
@@ -201,7 +301,7 @@ table.addEventListener("click", (e)=>{
   const academy1 = (getInput(row1,1)||{}).value || "";
 
   if(!name0 && !name1){
-    flash("名前が入力されていません");
+    flash(I18N[getLang()].noName);
     return;
   }
 
@@ -223,12 +323,12 @@ table.addEventListener("click", (e)=>{
 
   document.querySelectorAll(".matchCell.loaded").forEach(c=>c.classList.remove("loaded"));
   cell.classList.add("loaded");
-  flash(`MATCH ${matchIdx} をスコアラー画面に反映しました`);
+  flash(I18N[getLang()].flashLoaded(matchIdx));
 });
 
 document.getElementById("addMatchesBtn").addEventListener("click", ()=>{ addMatchRows(10); saveRoster(); });
 document.getElementById("clearBtn").addEventListener("click", ()=>{
-  if(!confirm("名簿の内容を全てクリアします。よろしいですか？")) return;
+  if(!confirm(I18N[getLang()].confirmClear)) return;
   table.querySelectorAll("input").forEach(inp=> inp.value = "");
   saveRoster();
 });

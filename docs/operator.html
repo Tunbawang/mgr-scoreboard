@@ -69,16 +69,30 @@
     .player-total{ font-size:24px; }
     .cat .score{ font-size:20px; }
   }
+
+  .langBar{ display:flex; justify-content:flex-end; gap:6px; margin-bottom:8px; }
+  .langBar button{
+    background:#e2e2e2; border:1px solid #999; color:#333; padding:4px 10px;
+    border-radius:2px; cursor:pointer; font-size:11px;
+  }
+  .langBar button.active{ background:#FFFF00; font-weight:700; }
+  .langBar button:hover{ background:#cfcfcf; }
 </style>
 </head>
 <body>
 <div id="wrap">
+  <div class="langBar" id="langBar">
+    <button data-lang="ja">日本語</button>
+    <button data-lang="en">English</button>
+    <button data-lang="pt">Português</button>
+    <button data-lang="zh">中文</button>
+  </div>
   <div class="topbar">
-    <h1>MARTIAL GRAPPLING RULES ー スコアラー操作画面</h1>
+    <h1><span data-i18n="brand">MARTIAL GRAPPLING RULES</span> <span data-i18n="operatorH1suffix">ー スコアラー操作画面</span></h1>
     <div class="matchBadge" id="matchBadge">MATCH 1</div>
     <div class="links">
-      <a href="roster.html" target="_blank" rel="noopener">選手名簿を開く ▸</a>
-      <a href="display.html" target="_blank" rel="noopener">観客表示を新しいタブで開く ▸</a>
+      <a href="roster.html" target="_blank" rel="noopener"><span data-i18n="openRoster">参加者名簿を開く</span> ▸</a>
+      <a href="display.html" target="_blank" rel="noopener"><span data-i18n="openDisplay">観客表示を新しいタブで開く</span> ▸</a>
     </div>
   </div>
 
@@ -86,7 +100,7 @@
     <div class="player-head">
       <div class="nameBlock">
         <input type="text" class="nameInput" data-player="0" value="JIROU YAMADA">
-        <input type="text" class="academyInput" data-player="0" placeholder="道場名" value="">
+        <input type="text" class="academyInput" data-player="0" data-i18n-placeholder="academyPlaceholder" placeholder="道場名" value="">
       </div>
       <div class="player-total num" data-player="0">0</div>
     </div>
@@ -97,7 +111,7 @@
     <div class="player-head">
       <div class="nameBlock">
         <input type="text" class="nameInput" data-player="1" value="BAN MOROBOSHI">
-        <input type="text" class="academyInput" data-player="1" placeholder="道場名" value="">
+        <input type="text" class="academyInput" data-player="1" data-i18n-placeholder="academyPlaceholder" placeholder="道場名" value="">
       </div>
       <div class="player-total num" data-player="1">0</div>
     </div>
@@ -128,6 +142,71 @@ const CATS = [
   { key:"strike", label:"STRIKE", delta:1, cls:"strike" },
 ];
 const STORE_KEY = "mgr_scoreboard_state_v1";
+const LANG_KEY = "mgr_lang_v1";
+
+const I18N = {
+  ja: {
+    operatorH1suffix: "ー スコアラー操作画面",
+    openRoster: "参加者名簿を開く",
+    openDisplay: "観客表示を新しいタブで開く",
+    academyPlaceholder: "道場名",
+    timeResetPrompt: "試合時間を「分:秒」で入力してください（例 3:00）"
+  },
+  en: {
+    operatorH1suffix: "— Scorer Console",
+    openRoster: "Open Participant Roster",
+    openDisplay: "Open Audience Display (new tab)",
+    academyPlaceholder: "Academy",
+    timeResetPrompt: "Enter match time as \"min:sec\" (e.g. 3:00)"
+  },
+  pt: {
+    operatorH1suffix: "— Painel do Marcador",
+    openRoster: "Abrir Lista de Participantes",
+    openDisplay: "Abrir Exibição para o Público (nova aba)",
+    academyPlaceholder: "Academia",
+    timeResetPrompt: "Digite o tempo de luta como \"min:seg\" (ex. 3:00)"
+  },
+  zh: {
+    operatorH1suffix: "— 计分员操作面板",
+    openRoster: "打开参赛者名单",
+    openDisplay: "在新标签页中打开观众显示",
+    academyPlaceholder: "道馆名称",
+    timeResetPrompt: "请输入比赛时间「分:秒」（例如 3:00）"
+  }
+};
+
+const TITLES = {
+  ja: "スコアラー操作画面 - MARTIAL GRAPPLING RULES",
+  en: "Scorer Console - MARTIAL GRAPPLING RULES",
+  pt: "Painel do Marcador - MARTIAL GRAPPLING RULES",
+  zh: "计分员操作面板 - MARTIAL GRAPPLING RULES"
+};
+
+function getLang(){ return localStorage.getItem(LANG_KEY) || "ja"; }
+function setLang(lang){
+  localStorage.setItem(LANG_KEY, lang);
+  applyLanguage(lang);
+}
+function applyLanguage(lang){
+  const dict = I18N[lang] || I18N.ja;
+  document.title = TITLES[lang] || TITLES.ja;
+  document.querySelectorAll("[data-i18n]").forEach(el=>{
+    const key = el.dataset.i18n;
+    if(dict[key]) el.textContent = dict[key];
+  });
+  document.querySelectorAll("[data-i18n-placeholder]").forEach(el=>{
+    const key = el.dataset.i18nPlaceholder;
+    if(dict[key]) el.placeholder = dict[key];
+  });
+  document.querySelectorAll("#langBar button").forEach(btn=>{
+    btn.classList.toggle("active", btn.dataset.lang === lang);
+  });
+}
+document.querySelectorAll("#langBar button").forEach(btn=>{
+  btn.addEventListener("click", ()=> setLang(btn.dataset.lang));
+});
+applyLanguage(getLang());
+
 
 function defaultState(){
   const player = () => ({ escape:0, shiho:0, mount:0, turtle:0, strike:0 });
@@ -246,7 +325,7 @@ function onStartStop(){
 
 function onTimeReset(){
   const cur = fmt(state.durationSec);
-  const ans = prompt("試合時間を「分:秒」で入力してください（例 3:00）", cur);
+  const ans = prompt(I18N[getLang()].timeResetPrompt, cur);
   if(ans === null || ans.trim() === "") return;
   let m=0, s=0;
   if(ans.includes(":")){
